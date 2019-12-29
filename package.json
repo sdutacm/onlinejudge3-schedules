@@ -1,0 +1,24 @@
+{
+  "name": "schedules",
+  "version": "1.0.0",
+  "description": "Node cron tasks",
+  "main": "index.js",
+  "scripts": {
+    "start:schedules": "cross-env NODE_ENV=development node index.js",
+    "pm2:start": "pm2 start index.js --name schedules --watch --ignore-watch=\"logs\"",
+    "pm2:stop": "pm2 stop schedules",
+    "pm2:restart": "pm2 restart schedules"
+  },
+  "keywords": [],
+  "author": "bLue",
+  "license": "ISC",
+  "dependencies": {
+    "cross-env": "^6.0.3",
+    "fs-extra": "^8.1.0",
+    "log4js": "^6.1.0",
+    "moment": "^2.24.0",
+    "mysql2": "^2.1.0",
+    "node-schedule": "^1.3.2",
+    "redis": "^2.8.0"
+  }
+}
