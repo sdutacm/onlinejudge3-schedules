@@ -51,7 +51,7 @@ async function genSitemap() {
   fs.writeFileSync(sitemapConf.problems, problemIds.map(id => `${OJ3_BASE}/problems/${id}`).join('\n'));
   const topicIds = (await query(`SELECT topic_id FROM topic`)).map(r => r.topic_id);
   fs.ensureFileSync(sitemapConf.topics);
-  fs.writeFileSync(sitemapConf.posts, topicIds.map(id => `${OJ3_BASE}/topics/${id}`).join('\n'));
+  fs.writeFileSync(sitemapConf.topics, topicIds.map(id => `${OJ3_BASE}/topics/${id}`).join('\n'));
   const postIds = (await query(`SELECT news_id FROM news WHERE display=?`, [1])).map(r => r.news_id);
   fs.ensureFileSync(sitemapConf.posts);
   fs.writeFileSync(sitemapConf.posts, postIds.map(id => `${OJ3_BASE}/posts/${id}`).join('\n'));
