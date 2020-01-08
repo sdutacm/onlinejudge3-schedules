@@ -69,13 +69,17 @@ async function prerender() {
     ...fs.readFileSync(sitemapConf.posts).toString().split('\n').filter(url => url),
   ];
 
-  const browser = await puppeteer.launch({
+  const opt = {
     // headless: false,
     defaultViewport: {
       width: 412,
       height: 732,
     },
-  });
+  };
+  if (!isDev) {
+    opt.args = ['--no-sandbox', '--disable-setuid-sandbox'];
+  }
+  const browser = await puppeteer.launch(opt);
   try {
     const ua = 'Mozilla/5.0 (compatible; sdutacmbot/0.1; +https://acm.sdut.edu.cn/)';
     const page = await browser.newPage();
