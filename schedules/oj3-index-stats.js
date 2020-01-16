@@ -59,7 +59,7 @@ async function getUserACRank(startAt, type, updateEvery) {
     log.warn(`[getUserACRank] [${type}]`, 'no solutions found');
   } else {
     const startSolutionId = startSolutionRes[0].solution_id;
-    const solutions = await query(`SELECT solution_id, problem_id, user_id, sub_time FROM solution WHERE result=1 AND solution_id>=?`, [startSolutionId]);
+    const solutions = await query(`SELECT solution_id, problem_id, user_id, sub_time FROM solution WHERE result=1 AND user_id<10000000 AND solution_id>=?`, [startSolutionId]);
     log.info(`[getUserACRank] [${type}] solutions:`, solutions.length);
     const uMap = new Map();
     for (const solution of solutions) {

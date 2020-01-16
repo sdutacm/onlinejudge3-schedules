@@ -88,7 +88,7 @@ async function prerender() {
     await page.goto(`${OJ3_BASE}/blank`);
     await page.waitForSelector('.content-loaded');
     for (const url of urls) {
-      log.info('[prerender]', url);
+      // log.info('[prerender]', url);
       const relativeUrlRegRes = /onlinejudge3(\S+)/.exec(url) || [];
       const relativeUrl = relativeUrlRegRes[1];
       const regRes = /onlinejudge3\/(\w+)\/(\w+)/.exec(url) || [];
