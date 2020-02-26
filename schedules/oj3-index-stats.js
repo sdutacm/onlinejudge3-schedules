@@ -1,6 +1,6 @@
 // const mysql = require('mysql2');
 const mysql = require('mysql2/promise');
-const redis = require("redis");
+const redis = require('redis');
 const logger = require('../utils/logger');
 const moment = require('moment');
 require('moment/locale/zh-cn');
@@ -40,7 +40,7 @@ async function init() {
   }
   if (!redisClient) {
     redisClient = redis.createClient();
-    redisClient.on('error', function (err) {
+    redisClient.on('error', function(err) {
       log.error('[redis.error]', err);
     });
   }
@@ -51,15 +51,21 @@ async function getUserACRank(startAt, type, updateEvery) {
   const _start = Date.now();
   await init();
 
-  let result = []
+  let result = [];
 
   // startAt = '2018-09-28 00:00:00'; // tmp
-  const startSolutionRes = await query(`SELECT solution_id FROM solution WHERE sub_time>=? LIMIT 1`, [startAt]);
+  const startSolutionRes = await query(
+    `SELECT solution_id FROM solution WHERE sub_time>=? LIMIT 1`,
+    [startAt],
+  );
   if (!startSolutionRes.length) {
     log.warn(`[getUserACRank] [${type}]`, 'no solutions found');
   } else {
     const startSolutionId = startSolutionRes[0].solution_id;
-    const solutions = await query(`SELECT solution_id, problem_id, user_id, sub_time FROM solution WHERE result=1 AND user_id<10000000 AND solution_id>=?`, [startSolutionId]);
+    const solutions = await query(
+      `SELECT solution_id, problem_id, user_id, sub_time FROM solution WHERE result=1 AND user_id<10000000 AND solution_id>=?`,
+      [startSolutionId],
+    );
     log.info(`[getUserACRank] [${type}] solutions:`, solutions.length);
     const uMap = new Map();
     for (const solution of solutions) {
@@ -67,7 +73,7 @@ async function getUserACRank(startAt, type, updateEvery) {
         solution_id: solutionId,
         user_id: userId,
         problem_id: problemId,
-        sub_time: createdAt
+        sub_time: createdAt,
       } = solution;
       if (!uMap.has(userId)) {
         uMap.set(userId, new Set());
@@ -82,38 +88,44 @@ async function getUserACRank(startAt, type, updateEvery) {
       // 查询每个题目是否之前被 AC 过
       const problems = Array.from(pSet.values());
       for (const problemId of problems) {
-        const isACRes = await query(`SELECT solution_id FROM solution WHERE user_id=? AND problem_id=? AND result=1 AND solution_id<? LIMIT 1`, [userId, problemId, startSolutionId]);
+        const isACRes = await query(
+          `SELECT solution_id FROM solution WHERE user_id=? AND problem_id=? AND result=1 AND solution_id<? LIMIT 1`,
+          [userId, problemId, startSolutionId],
+        );
         if (isACRes.length) {
           pSet.delete(problemId);
         }
       }
     }
     result = Array.from(uMap.keys())
-      .map(userId => ({
+      .map((userId) => ({
         userId,
         problems: Array.from(uMap.get(userId).values()),
       }))
-      .filter(item => item.problems.length > 0);
+      .filter((item) => item.problems.length > 0);
     result.sort((a, b) => {
       return b.problems.length - a.problems.length;
-    })
+    });
     // log.info('result', result);
   }
-  
+
   // 存入 redis
   topResult = result.slice(0, 20);
   const key = `stats:user_ac:${type}`;
-  redisClient.set(key, JSON.stringify({
-    count: topResult.length,
-    rows: topResult.map(r => ({
-      userId: r.userId,
-      accepted: r.problems.length,
-    })),
-    truncated: 20,
-    startAt,
-    _updateEvery: updateEvery,
-    _updatedAt: Date.now(),
-  }));
+  redisClient.set(
+    key,
+    JSON.stringify({
+      count: topResult.length,
+      rows: topResult.map((r) => ({
+        userId: r.userId,
+        accepted: r.problems.length,
+      })),
+      truncated: 20,
+      startAt,
+      _updateEvery: updateEvery,
+      _updatedAt: Date.now(),
+    }),
+  );
 
   log.info(`[getUserACRank.done] [${type}] ${Date.now() - _start}ms`);
   return result;
@@ -136,7 +148,8 @@ function genTask(type) {
     case 'week':
       return () => getUserACRank(formatTime(moment().startOf('week')), 'week', 6 * 60 * 60 * 1000);
     case 'month':
-      return () => getUserACRank(formatTime(moment().startOf('month')), 'month', 24 * 60 * 60 * 1000);
+      return () =>
+        getUserACRank(formatTime(moment().startOf('month')), 'month', 24 * 60 * 60 * 1000);
   }
 }
 

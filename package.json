@@ -13,6 +13,7 @@
   "author": "bLue",
   "license": "ISC",
   "dependencies": {
+    "bluebird": "^3.7.2",
     "cross-env": "^6.0.3",
     "fs-extra": "^8.1.0",
     "log4js": "^6.1.0",
