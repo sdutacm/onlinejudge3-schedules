@@ -7,4 +7,5 @@ yarn.lock
 /dist
 /logs
 /configs/oj-db.prod.js
+/configs/oj-redis.prod.js
 /temp
