@@ -6,6 +6,7 @@ const logger = require('../utils/logger');
 const moment = require('moment');
 require('moment/locale/zh-cn');
 const util = require('util');
+const PromiseQueue = require('promise-queue');
 
 bluebird.promisifyAll(redis.RedisClient.prototype);
 bluebird.promisifyAll(redis.Multi.prototype);
@@ -16,14 +17,21 @@ const isDev = process.env.NODE_ENV === 'development';
 
 const log = logger.getLogger(isDev ? 'schedulesDev' : 'schedulesProd');
 let dbConf = {};
+let redisConf = {};
 if (isDev) {
   dbConf = require('../configs/oj-db.dev');
+  redisConf = require('../configs/oj-redis.dev');
 } else {
   dbConf = require('../configs/oj-db.prod');
+  redisConf = require('../configs/oj-redis.prod');
 }
+
+const MAX_PARALLEL_TASK_NUM = 2;
+const MAX_MYSQL_POOL_CONNECTION = 2;
 
 let conn;
 let redisClient;
+let pq = new PromiseQueue(MAX_PARALLEL_TASK_NUM, Infinity);
 
 const updateEvery = 10 * 60 * 1000; // 每 10min 更新一次
 const maxSolutionNumPerUpdate = 1000000; // 每次更新最大获取的 solution 数
@@ -91,10 +99,16 @@ function formatTime(momentObj) {
 
 async function init() {
   if (!conn) {
-    conn = await mysql.createConnection(dbConf);
+    // conn = await mysql.createConnection(dbConf);
+    conn = await mysql.createPool({
+      ...dbConf,
+      waitForConnections: true,
+      connectionLimit: MAX_MYSQL_POOL_CONNECTION,
+      queueLimit: 0,
+    });
   }
   if (!redisClient) {
-    redisClient = redis.createClient();
+    redisClient = redis.createClient(redisConf);
     redisClient.on('error', function(err) {
       log.error('[redis.error]', err);
     });
@@ -114,49 +128,54 @@ async function getUserAcceptedProblems() {
   let newLastSolutionId = Math.min(lastSolutionId + maxSolutionNumPerUpdate, maxSolutionId);
 
   // 获取有新增 AC 的用户列表
-  log.info(
-    `[getUserAcceptedProblems] solution range: [${lastSolutionId + 1}, ${newLastSolutionId}]`,
-  );
   result = await query(
     'SELECT DISTINCT(user_id) FROM solution WHERE result=1 and solution_id>? and solution_id<=?',
     [lastSolutionId, newLastSolutionId],
   );
   const userIds = result.map((r) => r.user_id);
   log.info(
-    `[getUserAcceptedProblems] new AC users: ${userIds.length}`,
+    `[getUserAcceptedProblems] solutions: [${lastSolutionId + 1}, ${newLastSolutionId}], AC users: ${userIds.length}`,
   );
+
+  const queueTasks = [];
   for (const userId of userIds) {
     // 屏蔽非法用户（包括注册比赛用户）
     if (!userId || userId >= 10000000) {
       continue;
     }
     // 处理每个有新增 AC 的用户的数据
-    result = await query(
-      'SELECT solution_id, problem_id, sub_time FROM solution WHERE result=1 and user_id=?',
-      [userId],
+    queueTasks.push(
+      pq.add(async () => {
+        const userSolutions = await query(
+          'SELECT solution_id, problem_id, sub_time FROM solution WHERE result=1 and user_id=?',
+          [userId],
+        );
+        const acceptedProblemsSet = new Set();
+        const acceptedProblems = [];
+        for (const s of userSolutions) {
+          const { solution_id: solutionId, problem_id: problemId, sub_time } = s;
+          if (acceptedProblemsSet.has(problemId)) {
+            continue;
+          }
+          const submittedAt = sub_time.getTime() / 1000;
+          acceptedProblemsSet.add(problemId);
+          acceptedProblems.push({
+            pid: problemId,
+            sid: solutionId,
+            at: submittedAt,
+          });
+        }
+        const userAcceptedProblemsData = {
+          accepted: acceptedProblems.length,
+          problems: acceptedProblems,
+          _updatedAt: Date.now(),
+        };
+        await setRedisKey(util.format(redisDataKey, userId), userAcceptedProblemsData);
+      }),
     );
-    const acceptedProblemsSet = new Set();
-    const acceptedProblems = [];
-    for (const r of result) {
-      const { solution_id: solutionId, problem_id: problemId, sub_time } = r;
-      if (acceptedProblemsSet.has(problemId)) {
-        continue;
-      }
-      const submittedAt = sub_time.getTime() / 1000;
-      acceptedProblemsSet.add(problemId);
-      acceptedProblems.push({
-        pid: problemId,
-        sid: solutionId,
-        at: submittedAt,
-      });
-    }
-    const userAcceptedProblemsData = {
-      accepted: acceptedProblems.length,
-      problems: acceptedProblems,
-      _updatedAt: Date.now(),
-    };
-    await setRedisKey(util.format(redisDataKey, userId), userAcceptedProblemsData);
   }
+  await Promise.all(queueTasks);
+
   // 更新 run info
   await setRedisKey(redisRunInfoKey, {
     lastSolutionId: newLastSolutionId,

@@ -12,10 +12,13 @@ const isDev = process.env.NODE_ENV === 'development';
 
 const log = logger.getLogger(isDev ? 'schedulesDev' : 'schedulesProd');
 let dbConf = {};
+let redisConf = {};
 if (isDev) {
   dbConf = require('../configs/oj-db.dev');
+  redisConf = require('../configs/oj-redis.dev');
 } else {
   dbConf = require('../configs/oj-db.prod');
+  redisConf = require('../configs/oj-redis.prod');
 }
 
 let conn;
@@ -39,7 +42,7 @@ async function init() {
     conn = await mysql.createConnection(dbConf);
   }
   if (!redisClient) {
-    redisClient = redis.createClient();
+    redisClient = redis.createClient(redisConf);
     redisClient.on('error', function(err) {
       log.error('[redis.error]', err);
     });
