@@ -44,7 +44,7 @@ const maxSolutionNumPerUpdate = 1000000; // 每次更新最大获取的 solution
  *   _updatedAt: number; // timestamp (ms)
  * }
  */
-const redisRunInfoKey = 'stats:user_accepted_problems_run_info';
+const redisRunInfoKey = 'stats:user_a_s_problems_run_info';
 
 /**
  * uap
