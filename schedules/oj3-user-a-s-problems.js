@@ -133,8 +133,8 @@ async function init() {
   }
 }
 
-async function getUserAcceptedProblems() {
-  log.info(`[getUserAcceptedProblems.start]`);
+async function getUserASProblems() {
+  log.info(`[getUserASProblems.start]`);
   const _start = Date.now();
   await init();
 
@@ -157,7 +157,7 @@ async function getUserAcceptedProblems() {
   );
   const userIds = result.map((r) => r.user_id);
   log.info(
-    `[getUserAcceptedProblems] solutions: [${lastSolutionId +
+    `[getUserASProblems] solutions: [${lastSolutionId +
       1}, ${newLastSolutionId}], submitted users: ${userIds.length}`,
   );
 
@@ -239,12 +239,12 @@ async function getUserAcceptedProblems() {
     _updatedAt: _start,
   });
 
-  log.info(`[getUserAcceptedProblems.done] ${Date.now() - _start}ms`);
+  log.info(`[getUserASProblems.done] ${Date.now() - _start}ms`);
   return result;
 }
 
 async function main() {
-  await getUserAcceptedProblems();
+  await getUserASProblems();
 }
 
 // main();
@@ -252,6 +252,6 @@ async function main() {
 module.exports = [
   {
     cron: '2,12,22,32,42,52 * * * *',
-    task: getUserAcceptedProblems,
+    task: getUserASProblems,
   },
 ];
