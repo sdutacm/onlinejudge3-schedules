@@ -59,86 +59,90 @@ function init() {
 async function getUserACRank(startAt, type, updateEvery) {
   log.info(`[getUserACRank.start] [${type}]`, startAt);
   const _start = Date.now();
-  init();
+  try {
+    init();
 
-  let result = [];
+    let result = [];
 
-  // startAt = '2018-09-28 00:00:00'; // tmp
-  const startSolutionRes = await query(
-    `SELECT solution_id FROM solution WHERE sub_time>=? LIMIT 1`,
-    [startAt],
-  );
-  if (!startSolutionRes.length) {
-    log.warn(`[getUserACRank] [${type}]`, 'no solutions found');
-  } else {
-    const startSolutionId = startSolutionRes[0].solution_id;
-    const solutions = await query(
-      `SELECT solution_id, problem_id, user_id, sub_time FROM solution WHERE result=1 AND user_id<10000000 AND solution_id>=?`,
-      [startSolutionId],
+    // startAt = '2018-09-28 00:00:00'; // tmp
+    const startSolutionRes = await query(
+      `SELECT solution_id FROM solution WHERE sub_time>=? LIMIT 1`,
+      [startAt],
     );
-    log.info(`[getUserACRank] [${type}] solutions:`, solutions.length);
-    const uMap = new Map();
-    for (const solution of solutions) {
-      const {
-        solution_id: solutionId,
-        user_id: userId,
-        problem_id: problemId,
-        sub_time: createdAt,
-      } = solution;
-      if (!uMap.has(userId)) {
-        uMap.set(userId, new Set());
+    if (!startSolutionRes.length) {
+      log.warn(`[getUserACRank] [${type}]`, 'no solutions found');
+    } else {
+      const startSolutionId = startSolutionRes[0].solution_id;
+      const solutions = await query(
+        `SELECT solution_id, problem_id, user_id, sub_time FROM solution WHERE result=1 AND user_id<10000000 AND solution_id>=?`,
+        [startSolutionId],
+      );
+      log.info(`[getUserACRank] [${type}] solutions:`, solutions.length);
+      const uMap = new Map();
+      for (const solution of solutions) {
+        const {
+          solution_id: solutionId,
+          user_id: userId,
+          problem_id: problemId,
+          sub_time: createdAt,
+        } = solution;
+        if (!uMap.has(userId)) {
+          uMap.set(userId, new Set());
+        }
+        const pSet = uMap.get(userId);
+        pSet.add(problemId);
       }
-      const pSet = uMap.get(userId);
-      pSet.add(problemId);
-    }
-    // log.info(uMap);
-    // log.info('users', Array.from(uMap.keys()).length);
-    for (const [userId, pSet] of uMap) {
-      // log.info(userId, pSet);
-      // 查询每个题目是否之前被 AC 过
-      const problems = Array.from(pSet.values());
-      for (const problemId of problems) {
-        const isACRes = await query(
-          `SELECT solution_id FROM solution WHERE user_id=? AND problem_id=? AND result=1 AND solution_id<? LIMIT 1`,
-          [userId, problemId, startSolutionId],
-        );
-        if (isACRes.length) {
-          pSet.delete(problemId);
+      // log.info(uMap);
+      // log.info('users', Array.from(uMap.keys()).length);
+      for (const [userId, pSet] of uMap) {
+        // log.info(userId, pSet);
+        // 查询每个题目是否之前被 AC 过
+        const problems = Array.from(pSet.values());
+        for (const problemId of problems) {
+          const isACRes = await query(
+            `SELECT solution_id FROM solution WHERE user_id=? AND problem_id=? AND result=1 AND solution_id<? LIMIT 1`,
+            [userId, problemId, startSolutionId],
+          );
+          if (isACRes.length) {
+            pSet.delete(problemId);
+          }
         }
       }
+      result = Array.from(uMap.keys())
+        .map((userId) => ({
+          userId,
+          problems: Array.from(uMap.get(userId).values()),
+        }))
+        .filter((item) => item.problems.length > 0);
+      result.sort((a, b) => {
+        return b.problems.length - a.problems.length;
+      });
+      // log.info('result', result);
     }
-    result = Array.from(uMap.keys())
-      .map((userId) => ({
-        userId,
-        problems: Array.from(uMap.get(userId).values()),
-      }))
-      .filter((item) => item.problems.length > 0);
-    result.sort((a, b) => {
-      return b.problems.length - a.problems.length;
-    });
-    // log.info('result', result);
+
+    // 存入 redis
+    topResult = result.slice(0, 20);
+    const key = `stats:user_ac:${type}`;
+    redisClient.set(
+      key,
+      JSON.stringify({
+        count: topResult.length,
+        rows: topResult.map((r) => ({
+          userId: r.userId,
+          accepted: r.problems.length,
+        })),
+        truncated: 20,
+        startAt,
+        _updateEvery: updateEvery,
+        _updatedAt: Date.now(),
+      }),
+    );
+
+    log.info(`[getUserACRank.done] [${type}] ${Date.now() - _start}ms`);
+    return result;
+  } catch (e) {
+    log.error(`[getUserACRank.error] [${type}]`, e);
   }
-
-  // 存入 redis
-  topResult = result.slice(0, 20);
-  const key = `stats:user_ac:${type}`;
-  redisClient.set(
-    key,
-    JSON.stringify({
-      count: topResult.length,
-      rows: topResult.map((r) => ({
-        userId: r.userId,
-        accepted: r.problems.length,
-      })),
-      truncated: 20,
-      startAt,
-      _updateEvery: updateEvery,
-      _updatedAt: Date.now(),
-    }),
-  );
-
-  log.info(`[getUserACRank.done] [${type}] ${Date.now() - _start}ms`);
-  return result;
 }
 
 async function main() {
