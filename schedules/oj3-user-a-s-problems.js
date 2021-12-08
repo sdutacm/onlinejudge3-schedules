@@ -115,10 +115,10 @@ function formatTime(momentObj) {
   return momentObj.format('YYYY-MM-DD HH:mm:ss');
 }
 
-async function init() {
+function init() {
   if (!conn) {
     // conn = await mysql.createConnection(dbConf);
-    conn = await mysql.createPool({
+    conn = mysql.createPool({
       ...dbConf,
       waitForConnections: true,
       connectionLimit: MAX_MYSQL_POOL_CONNECTION,
@@ -136,7 +136,7 @@ async function init() {
 async function getUserASProblems() {
   log.info(`[getUserASProblems.start]`);
   const _start = Date.now();
-  await init();
+  init();
 
   let result = [];
   const runInfo = await getRedisKey(redisRunInfoKey);

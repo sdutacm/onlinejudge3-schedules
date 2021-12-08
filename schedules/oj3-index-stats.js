@@ -21,6 +21,8 @@ if (isDev) {
   redisConf = require('../configs/oj-redis.prod');
 }
 
+const MAX_MYSQL_POOL_CONNECTION = 2;
+
 let conn;
 let redisClient;
 
@@ -37,13 +39,18 @@ function formatTime(momentObj) {
   return momentObj.format('YYYY-MM-DD HH:mm:ss');
 }
 
-async function init() {
+function init() {
   if (!conn) {
-    conn = await mysql.createConnection(dbConf);
+    conn = mysql.createPool({
+      ...dbConf,
+      waitForConnections: true,
+      connectionLimit: MAX_MYSQL_POOL_CONNECTION,
+      queueLimit: 0,
+    });
   }
   if (!redisClient) {
     redisClient = redis.createClient(redisConf);
-    redisClient.on('error', function(err) {
+    redisClient.on('error', function (err) {
       log.error('[redis.error]', err);
     });
   }
@@ -52,7 +59,7 @@ async function init() {
 async function getUserACRank(startAt, type, updateEvery) {
   log.info(`[getUserACRank.start] [${type}]`, startAt);
   const _start = Date.now();
-  await init();
+  init();
 
   let result = [];
 

@@ -24,6 +24,8 @@ if (isDev) {
   prerenderConf = require('../configs/oj3-prerender.prod');
 }
 
+const MAX_MYSQL_POOL_CONNECTION = 2;
+
 let conn;
 
 async function query(sql, params) {
@@ -35,26 +37,38 @@ async function query(sql, params) {
   return rows;
 }
 
-async function init() {
+function init() {
   if (!conn) {
-    conn = await mysql.createConnection(dbConf);
+    conn = mysql.createPool({
+      ...dbConf,
+      waitForConnections: true,
+      connectionLimit: MAX_MYSQL_POOL_CONNECTION,
+      queueLimit: 0,
+    });
   }
 }
 
 async function genSitemap() {
   log.info('[genSitemap.start]');
   const _start = Date.now();
-  await init();
+  init();
 
-  const problemIds = (await query(`SELECT problem_id FROM problem WHERE display=?`, [1])).map(r => r.problem_id);
+  const problemIds = (await query(`SELECT problem_id FROM problem WHERE display=?`, [1])).map(
+    (r) => r.problem_id,
+  );
   fs.ensureFileSync(sitemapConf.problems);
-  fs.writeFileSync(sitemapConf.problems, problemIds.map(id => `${OJ3_BASE}/problems/${id}`).join('\n'));
-  const topicIds = (await query(`SELECT topic_id FROM topic`)).map(r => r.topic_id);
+  fs.writeFileSync(
+    sitemapConf.problems,
+    problemIds.map((id) => `${OJ3_BASE}/problems/${id}`).join('\n'),
+  );
+  const topicIds = (await query(`SELECT topic_id FROM topic`)).map((r) => r.topic_id);
   fs.ensureFileSync(sitemapConf.topics);
-  fs.writeFileSync(sitemapConf.topics, topicIds.map(id => `${OJ3_BASE}/topics/${id}`).join('\n'));
-  const postIds = (await query(`SELECT news_id FROM news WHERE display=?`, [1])).map(r => r.news_id);
+  fs.writeFileSync(sitemapConf.topics, topicIds.map((id) => `${OJ3_BASE}/topics/${id}`).join('\n'));
+  const postIds = (await query(`SELECT news_id FROM news WHERE display=?`, [1])).map(
+    (r) => r.news_id,
+  );
   fs.ensureFileSync(sitemapConf.posts);
-  fs.writeFileSync(sitemapConf.posts, postIds.map(id => `${OJ3_BASE}/posts/${id}`).join('\n'));
+  fs.writeFileSync(sitemapConf.posts, postIds.map((id) => `${OJ3_BASE}/posts/${id}`).join('\n'));
 
   log.info(`[genSitemap.done] ${Date.now() - _start}ms`);
 }
@@ -64,9 +78,21 @@ async function prerender() {
   const _start = Date.now();
 
   const urls = [
-    ...fs.readFileSync(sitemapConf.problems).toString().split('\n').filter(url => url),
-    ...fs.readFileSync(sitemapConf.topics).toString().split('\n').filter(url => url),
-    ...fs.readFileSync(sitemapConf.posts).toString().split('\n').filter(url => url),
+    ...fs
+      .readFileSync(sitemapConf.problems)
+      .toString()
+      .split('\n')
+      .filter((url) => url),
+    ...fs
+      .readFileSync(sitemapConf.topics)
+      .toString()
+      .split('\n')
+      .filter((url) => url),
+    ...fs
+      .readFileSync(sitemapConf.posts)
+      .toString()
+      .split('\n')
+      .filter((url) => url),
   ];
 
   const opt = {
@@ -100,12 +126,12 @@ async function prerender() {
       // await page.goto(url);
       await page.evaluate((relativeUrl) => {
         _router.replace(relativeUrl);
-      }, relativeUrl)
+      }, relativeUrl);
       // await page.waitFor(200);
       await page.waitForSelector('.content-loaded');
       await page.evaluate(() => {
-        document.querySelectorAll('script').forEach(elm => elm.remove());
-      })
+        document.querySelectorAll('script').forEach((elm) => elm.remove());
+      });
       const html = await page.content();
       fs.ensureDirSync(prerenderConf[module]);
       fs.writeFileSync(path.join(prerenderConf[module], `${id}.html`), html);
