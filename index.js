@@ -1,14 +1,20 @@
+const path = require('path');
+const execa = require('execa');
 const schedule = require('node-schedule');
-const oj3IndexStats = require('./schedules/oj3-index-stats');
-const oj3Sitemap = require('./schedules/oj3-sitemap');
-const getUserASProblems = require('./schedules/oj3-user-a-s-problems');
+const { schedules } = require('./configs/schedules');
 
-oj3IndexStats.forEach((t) => {
-  schedule.scheduleJob(t.cron, t.task);
-});
-oj3Sitemap.forEach((t) => {
-  schedule.scheduleJob(t.cron, t.task);
-});
-getUserASProblems.forEach((t) => {
-  schedule.scheduleJob(t.cron, t.task);
-});
+function genTask(script, args) {
+  return () =>
+    execa.node(script, args, {
+      stdio: 'inherit',
+      cwd: process.cwd(),
+      shell: true,
+    });
+}
+
+for (const scheduleName of schedules) {
+  const scheduleJobs = require(path.join(__dirname, 'schedules', scheduleName));
+  scheduleJobs.forEach((t) => {
+    schedule.scheduleJob(t.cron, genTask(t.script, t.args));
+  });
+}

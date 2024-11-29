@@ -1,6 +1,8 @@
 const log4js = require('log4js');
+const { isProd } = require('./env');
+const { schedules } = require('../configs/schedules');
 
-log4js.configure({
+const options = {
   appenders: {
     console: {
       type: 'console',
@@ -9,25 +11,50 @@ log4js.configure({
       type: 'file',
       filename: 'logs/log.log',
     },
-    schedulesFile: {
-      type: 'file',
-      filename: 'logs/schedules.log',
-    },
   },
   categories: {
     default: {
       appenders: ['console', 'file'],
-      level: 'info'
+      level: 'info',
     },
-    schedulesDev: {
+    dev: {
       appenders: ['console'],
-      level: 'info'
+      level: 'info',
     },
-    schedulesProd: {
-      appenders: ['console', 'schedulesFile'],
-      level: 'info'
+    prod: {
+      appenders: ['console', 'file'],
+      level: 'info',
     },
-  }
-});
+  },
+};
 
-module.exports = log4js;
+for (const schedule of schedules) {
+  options.appenders[`file-${schedule}`] = {
+    type: 'file',
+    filename: `logs/${schedule}.log`,
+  };
+  options.categories[schedule] = {
+    appenders: ['console', `file-${schedule}`],
+    level: 'info',
+  };
+}
+
+log4js.configure(options);
+
+function getDefaultLogger() {
+  return log4js.getLogger(isProd ? 'prod' : 'dev');
+}
+
+function getCategoryLogger(schedule) {
+  return log4js.getLogger(schedule);
+}
+
+const logger = global.loggerCategory
+  ? getCategoryLogger(global.loggerCategory)
+  : getDefaultLogger();
+
+module.exports = {
+  logger,
+  getDefaultLogger,
+  getCategoryLogger,
+};

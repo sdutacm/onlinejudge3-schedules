@@ -1,57 +1,28 @@
-// const mysql = require('mysql2');
-const mysql = require('mysql2/promise');
+global.loggerCategory = 'oj3-sitemap';
+
 const fs = require('fs-extra');
 const path = require('path');
 const puppeteer = require('puppeteer');
-const logger = require('../utils/logger');
+const { isProd } = require('../../utils/env');
+const { logger } = require('../../utils/logger');
+const { getOjSqlAgent } = require('../../utils/sql');
+const { runMain } = require('../../utils/misc');
 
 const OJ3_BASE = 'https://acm.sdut.edu.cn/onlinejudge3';
-// const OJ3_BASE = 'http://localhost:8102/onlinejudge3';
 
-const isDev = process.env.NODE_ENV === 'development';
-// const isDev = true;
+const { query } = getOjSqlAgent();
 
-const log = logger.getLogger(isDev ? 'schedulesDev' : 'schedulesProd');
-let dbConf = {};
-let siteMapDir = '';
-if (isDev) {
-  dbConf = require('../configs/oj-db.dev');
-  sitemapConf = require('../configs/oj3-sitemap.dev');
-  prerenderConf = require('../configs/oj3-prerender.dev');
+if (!isProd) {
+  sitemapConf = require('../../configs/oj3-sitemap.dev');
+  prerenderConf = require('../../configs/oj3-prerender.dev');
 } else {
-  dbConf = require('../configs/oj-db.prod');
-  sitemapConf = require('../configs/oj3-sitemap.prod');
-  prerenderConf = require('../configs/oj3-prerender.prod');
-}
-
-const MAX_MYSQL_POOL_CONNECTION = 2;
-
-let conn;
-
-async function query(sql, params) {
-  const SQL = conn.format(sql, params);
-  isDev && log.info('[sql.start]', SQL);
-  const _start = Date.now();
-  const [rows] = await conn.query(SQL);
-  isDev && log.info(`[sql.done]  ${Date.now() - _start}ms`);
-  return rows;
-}
-
-function init() {
-  if (!conn) {
-    conn = mysql.createPool({
-      ...dbConf,
-      waitForConnections: true,
-      connectionLimit: MAX_MYSQL_POOL_CONNECTION,
-      queueLimit: 0,
-    });
-  }
+  sitemapConf = require('../../configs/oj3-sitemap.prod');
+  prerenderConf = require('../../configs/oj3-prerender.prod');
 }
 
 async function genSitemap() {
-  log.info('[genSitemap.start]');
+  logger.info('[genSitemap.start]');
   const _start = Date.now();
-  init();
 
   const problemIds = (await query(`SELECT problem_id FROM problem WHERE display=?`, [1])).map(
     (r) => r.problem_id,
@@ -70,11 +41,11 @@ async function genSitemap() {
   fs.ensureFileSync(sitemapConf.posts);
   fs.writeFileSync(sitemapConf.posts, postIds.map((id) => `${OJ3_BASE}/posts/${id}`).join('\n'));
 
-  log.info(`[genSitemap.done] ${Date.now() - _start}ms`);
+  logger.info(`[genSitemap.done] ${Date.now() - _start}ms`);
 }
 
 async function prerender() {
-  log.info('[prerender.start]');
+  logger.info('[prerender.start]');
   const _start = Date.now();
 
   const urls = [
@@ -102,7 +73,7 @@ async function prerender() {
       height: 732,
     },
   };
-  if (!isDev) {
+  if (isProd) {
     opt.args = ['--no-sandbox', '--disable-setuid-sandbox'];
   }
   const browser = await puppeteer.launch(opt);
@@ -114,7 +85,7 @@ async function prerender() {
     await page.goto(`${OJ3_BASE}/blank`);
     await page.waitForSelector('.content-loaded');
     for (const url of urls) {
-      // log.info('[prerender]', url);
+      // logger.info('[prerender]', url);
       const relativeUrlRegRes = /onlinejudge3(\S+)/.exec(url) || [];
       const relativeUrl = relativeUrlRegRes[1];
       const regRes = /onlinejudge3\/(\w+)\/(\w+)/.exec(url) || [];
@@ -138,11 +109,11 @@ async function prerender() {
       // break;
     }
   } catch (e) {
-    log.error('[prerender.error]', e);
+    logger.error('[prerender.error]', e);
     await browser.close();
   }
 
-  log.info(`[prerender.done] ${Date.now() - _start}ms`);
+  logger.info(`[prerender.done] ${Date.now() - _start}ms`);
 }
 
 async function genSitemapAndPrerender() {
@@ -154,11 +125,5 @@ async function main() {
   await genSitemapAndPrerender();
 }
 
-// main();
-
-module.exports = [
-  {
-    cron: '30 4 * * *',
-    task: genSitemapAndPrerender,
-  },
-];
+logger.info('start');
+runMain(main);

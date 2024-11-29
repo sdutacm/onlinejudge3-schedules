@@ -1,36 +1,17 @@
-// const mysql = require('mysql2');
-const mysql = require('mysql2/promise');
-const redis = require('redis');
-const bluebird = require('bluebird');
-const logger = require('../utils/logger');
-const moment = require('moment');
-require('moment/locale/zh-cn');
+global.loggerCategory = 'oj3-user-a-s-problems';
+
 const util = require('util');
 const PromiseQueue = require('promise-queue');
+const { logger } = require('../../utils/logger');
+const { getOjSqlAgent } = require('../../utils/sql');
+const { getOjRedisAgent } = require('../../utils/redis');
+const { runMain } = require('../../utils/misc');
 
-bluebird.promisifyAll(redis.RedisClient.prototype);
-bluebird.promisifyAll(redis.Multi.prototype);
-moment.locale('zh-cn');
-
-const isDev = process.env.NODE_ENV === 'development';
-// const isDev = true;
-
-const log = logger.getLogger(isDev ? 'schedulesDev' : 'schedulesProd');
-let dbConf = {};
-let redisConf = {};
-if (isDev) {
-  dbConf = require('../configs/oj-db.dev');
-  redisConf = require('../configs/oj-redis.dev');
-} else {
-  dbConf = require('../configs/oj-db.prod');
-  redisConf = require('../configs/oj-redis.prod');
-}
+const { query } = getOjSqlAgent({ connectionLimit: 2 });
+const redisClient = getOjRedisAgent();
 
 const MAX_PARALLEL_TASK_NUM = 2;
-const MAX_MYSQL_POOL_CONNECTION = 2;
 
-let conn;
-let redisClient;
 let pq = new PromiseQueue(MAX_PARALLEL_TASK_NUM, Infinity);
 
 const updateEvery = 10 * 60 * 1000; // 每 10min 更新一次
@@ -78,15 +59,6 @@ const redisUapKey = 'stats:user_accepted_problems:%d';
  */
 const redisUspKey = 'stats:user_submitted_problems:%d';
 
-async function query(sql, params) {
-  const SQL = conn.format(sql, params);
-  isDev && log.info('[sql.start]', SQL);
-  const _start = Date.now();
-  const [rows] = await conn.query(SQL);
-  isDev && log.info(`[sql.done]  ${Date.now() - _start}ms`);
-  return rows;
-}
-
 async function findOne(sql, params) {
   const res = await query(sql + ' LIMIT 1', params);
   if (res && res[0]) {
@@ -111,34 +83,10 @@ function setRedisKey(key, data, expiration) {
   return redisClient.setAsync(key, JSON.stringify(data));
 }
 
-function formatTime(momentObj) {
-  return momentObj.format('YYYY-MM-DD HH:mm:ss');
-}
-
-function init() {
-  if (!conn) {
-    // conn = await mysql.createConnection(dbConf);
-    conn = mysql.createPool({
-      ...dbConf,
-      waitForConnections: true,
-      connectionLimit: MAX_MYSQL_POOL_CONNECTION,
-      queueLimit: 0,
-    });
-  }
-  if (!redisClient) {
-    redisClient = redis.createClient(redisConf);
-    redisClient.on('error', function (err) {
-      log.error('[redis.error]', err);
-    });
-  }
-}
-
 async function getUserASProblems() {
-  log.info(`[getUserASProblems.start]`);
+  logger.info(`[getUserASProblems.start]`);
   const _start = Date.now();
   try {
-    init();
-
     let result = [];
     const runInfo = await getRedisKey(redisRunInfoKey);
     const lastSolutionId = (runInfo && runInfo.lastSolutionId) || 0;
@@ -157,7 +105,7 @@ async function getUserASProblems() {
       [lastSolutionId, newLastSolutionId],
     );
     const userIds = result.map((r) => r.user_id);
-    log.info(
+    logger.info(
       `[getUserASProblems] solutions: [${
         lastSolutionId + 1
       }, ${newLastSolutionId}], submitted users: ${userIds.length}`,
@@ -241,10 +189,10 @@ async function getUserASProblems() {
       _updatedAt: _start,
     });
 
-    log.info(`[getUserASProblems.done] ${Date.now() - _start}ms`);
+    logger.info(`[getUserASProblems.done] ${Date.now() - _start}ms`);
     return result;
   } catch (e) {
-    log.error(`[getUserASProblems.error]`, e);
+    logger.error(`[getUserASProblems.error]`, e);
   }
 }
 
@@ -252,11 +200,5 @@ async function main() {
   await getUserASProblems();
 }
 
-// main();
-
-module.exports = [
-  {
-    cron: '2,12,22,32,42,52 * * * *',
-    task: getUserASProblems,
-  },
-];
+logger.info('start');
+runMain(main);
