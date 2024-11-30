@@ -17,6 +17,7 @@ jobs:
       #     node-version: 16
       - run: pwd
       - run: ls -la ./
+      - run: cat ./package.json | jq '.version' | tr -d '"'
       - name: Get current package version
         uses: martinbeentjes/npm-get-version-action@v1.3.1
       - name: Set up Docker Buildx
