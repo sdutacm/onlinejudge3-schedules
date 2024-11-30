@@ -5,7 +5,8 @@
   "description": "Node cron tasks",
   "main": "index.js",
   "scripts": {
-    "start": "pm2-runtime start ecosystem.config.js",
+    "start": "node scripts/preload.js && npm run start:foreground",
+    "start:foreground": "pm2-runtime start ecosystem.config.js",
     "start:background": "pm2 start",
     "stop": "pm2 stop onlinejudge3-schedules",
     "reload": "pm2 reload onlinejudge3-schedules"

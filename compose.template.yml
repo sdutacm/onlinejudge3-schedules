@@ -1,0 +1,11 @@
+version: '3'
+services:
+  schedules:
+    image: sdutacm/onlinejudge3-schedules:latest
+    container_name: onlinejudge3-schedules
+    network_mode: bridge
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./logs:/app/logs
+      - ./configs:/app/configs-load:ro
