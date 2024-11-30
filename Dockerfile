@@ -7,9 +7,10 @@ COPY package-lock.json ./
 COPY .node-version ./
 COPY ecosystem.config.js ./
 COPY index.js ./
-COPY scripts ./scripts
-COPY schedules ./schedules
 COPY configs ./configs
+COPY scripts ./scripts
+COPY utils ./utils
+COPY schedules ./schedules
 RUN npm ci
 
 ENV PATH="/app/node_modules/pm2/bin:${PATH}"
