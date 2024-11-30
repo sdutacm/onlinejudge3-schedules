@@ -3,7 +3,7 @@ services:
   schedules:
     image: sdutacm/onlinejudge3-schedules:latest
     container_name: onlinejudge3-schedules
-    network_mode: bridge
+    network_mode: host
     environment:
       - TZ=Asia/Shanghai
     volumes:
