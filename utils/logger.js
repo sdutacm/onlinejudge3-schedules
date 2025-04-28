@@ -1,6 +1,8 @@
 const log4js = require('log4js');
 const { isProd } = require('./env');
-const { schedules } = require('../configs/schedules');
+
+const config = isProd ? require('../configs/schedules.prod') : require('../configs/schedules.dev');
+const schedules = config.schedules;
 
 const options = {
   appenders: {

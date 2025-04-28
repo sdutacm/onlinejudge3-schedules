@@ -1,7 +1,9 @@
 const path = require('path');
 const execa = require('execa');
 const schedule = require('node-schedule');
-const { schedules } = require('./configs/schedules');
+const { isProd } = require('./utils/env');
+const config = isProd ? require('./configs/schedules.prod') : require('./configs/schedules.dev');
+const schedules = config.schedules;
 
 function genTask(script, args) {
   return () =>
