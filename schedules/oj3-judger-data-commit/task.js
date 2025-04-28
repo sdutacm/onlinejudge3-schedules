@@ -72,6 +72,7 @@ async function fetchPendingCommits() {
     Region: cosConf.buckets.private.region,
     Prefix: remoteDataCommitDir,
     Delimiter: '/',
+    MaxKeys: 100,
   });
   const contents = res.Contents.filter((item) => item.Key.endsWith('.commit.json'));
   const commitList = contents.map((item) => {
