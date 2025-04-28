@@ -2,9 +2,7 @@ global.loggerCategory = 'oj3-judger-data-commit';
 
 const path = require('path');
 const fs = require('fs-extra');
-const util = require('util');
 const os = require('os');
-const childProcess = require('child_process');
 const AdmZip = require('adm-zip');
 const simpleGit = require('simple-git');
 const { logger } = require('../../utils/logger');
