@@ -17,6 +17,7 @@ const conf = isProd
 const remoteDataCommitDir = 'judger/data-commit/';
 const remoteDataReleaseDir = 'judger/data-release/';
 const git = simpleGit(path.resolve(conf.dataPath));
+const FETCH_COMMIT_LIMIT = 20;
 
 async function downloadCosPrivateFile(url) {
   const res = await cos.getObject({
@@ -70,7 +71,7 @@ async function fetchPendingCommits() {
     Region: cosConf.buckets.private.region,
     Prefix: remoteDataCommitDir,
     Delimiter: '/',
-    MaxKeys: 100,
+    MaxKeys: FETCH_COMMIT_LIMIT,
   });
   const contents = res.Contents.filter((item) => item.Key.endsWith('.commit.json'));
   const commitList = contents.map((item) => {
