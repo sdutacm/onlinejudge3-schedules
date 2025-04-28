@@ -1,5 +1,5 @@
 module.exports = {
-  dataPath: 'path/to/git-judger-data', // relative to cwd (project root)
+  dataPath: '/path/to/git-judger-data',
   dataGitBranch: 'master',
   dataGitUser: 'sdutacm',
   dataGitEmail: 'sdutacm@example.com',

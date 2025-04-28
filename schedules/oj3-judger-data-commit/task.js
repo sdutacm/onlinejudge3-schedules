@@ -18,7 +18,7 @@ const conf = isProd
   : require('../../configs/oj3-judger-data-commit.dev');
 const remoteDataCommitDir = 'judger/data-commit/';
 const remoteDataReleaseDir = 'judger/data-release/';
-const git = simpleGit(path.join(process.cwd(), conf.dataPath));
+const git = simpleGit(path.resolve(conf.dataPath));
 
 async function downloadCosPrivateFile(url) {
   const res = await cos.getObject({
@@ -203,7 +203,7 @@ async function main() {
       }
 
       // unzip data release file
-      const targetPath = path.join(process.cwd(), conf.dataPath, 'data', problemId.toString());
+      const targetPath = path.join(path.resolve(conf.dataPath), 'data', problemId.toString());
       logger.info(`[oj3-judger-data-commit] unzip "${dataReleaseTmpPath}" to "${targetPath}"`);
       const zip = new AdmZip(dataReleaseTmpPath);
       await fs.remove(targetPath);
